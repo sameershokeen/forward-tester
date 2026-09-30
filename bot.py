@@ -1,3 +1,6 @@
+TG_BOT_TOKEN = "8392707199:AAHjWHGLoZ3Udm4rS5JlgSaPLez1qZbHMOo"
+TG_CHAT_ID   = "1950462171"
+
 """
 Heikin Ashi x HMA(50) Crossover - FORWARD TEST (paper trading) + Telegram
 
@@ -31,7 +34,7 @@ EXCHANGE_ID   = "binance"
 SYMBOL        = "SOL/USDT"
 TIMEFRAMES    = ["3m", "5m"]
 HMA_LEN       = 25
-TP_MULT       = 10.0
+TP_MULT       = 10
 CANDLES       = 300
 POLL_SECS     = 10
 
@@ -39,7 +42,9 @@ START_CAPITAL = 100.0
 ROUND_TRIP    = 0.0004          # 0.04% per round trip
 REPORT_EVERY  = 24 * 60 * 60    # seconds
 NOTIFY_SIGNAL = True            # send entry alert
-NOTIFY_CLOSE  = False           # send a message when each trade closes
+NOTIFY_CLOSE  = True            # send a message when each trade closes
+SINGLE_TRADE_ONLY = False       # True = only ONE trade at a time across 3m AND 5m
+                                # (next signal is taken only after the open trade completes)
 STATE_FILE    = "forward_state.json"
 # ==================================================================
 
@@ -164,9 +169,11 @@ def check_open_trade(acct: dict, df: pd.DataFrame, tf: str):
             return
 
 
-def open_trade(acct: dict, ex, ha: pd.DataFrame, tf: str):
+def open_trade(acct: dict, ex, ha: pd.DataFrame, tf: str, st: dict):
     if acct["open"]:
         return  # pyramiding = 0
+    if SINGLE_TRADE_ONLY and any(a["open"] for a in st["accounts"].values()):
+        return  # wait until the running trade completes
     row = ha.iloc[-1]
     try:
         entry = float(ex.fetch_ticker(SYMBOL)["last"])
@@ -271,7 +278,7 @@ def main():
                     first_run = acct["last_seen"] is None
                     acct["last_seen"] = candle_ts
                     if not first_run and bool(ha.iloc[-1]["signal"]):
-                        open_trade(acct, ex, ha, tf)
+                        open_trade(acct, ex, ha, tf, st)
                 save_state(st)
             except Exception:
                 pass
@@ -287,3 +294,4 @@ if __name__ == "__main__":
         main()
     except KeyboardInterrupt:
         pass
+  
